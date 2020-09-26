@@ -114,21 +114,8 @@ export function assertEquals<T>(object: any): T;
 export function createAssertEquals<T>(): (object: any) => T;
 
 /**
- * Options for the `AssertType` decorator.
- */
-export interface AssertTypeOptions {
-  /**
-   * Message that will be passed to the error constructor, in case type assertion fails.
-   */
-  message?: string;
-}
-
-/**
  * Creates a type assertion and saves it in the reflection metadata of the method's class.
  * Then, when the class is decorated with `ValidateClass`, the method's arguments will be validated.
- *
- * @param options options for the decorator.
- * Check `AssertTypeOptions` documentation for more information.
  *
  * @example
  * ```
@@ -138,7 +125,7 @@ export interface AssertTypeOptions {
    new A().method('0' as any); // will throw an error
    ```
  */
-export function AssertType(options?: AssertTypeOptions): (target: object, propertyKey: string | symbol, parameterIndex: number) => void;
+export function AssertType(): (target: object, propertyKey: string | symbol, parameterIndex: number) => void;
 
 /**
  * Overrides methods in the target class with a proxy that will first validate the argument types.
@@ -177,11 +164,118 @@ export function ValidateClass(errorConstructor?: { new(): Error }): <TFunction e
    }
    ```
  */
-export class TypeGuardError extends Error { }
+export class TypeGuardError extends Error {
+    public readonly path: string[];
+    public readonly reason: Reason;
+    public readonly input: unknown;
+}
+
+interface ExpectedString {
+    type: 'string';
+}
+
+interface ExpectedNumber {
+    type: 'number';
+}
+
+interface ExpectedBigInt {
+    type: 'big-int';
+}
+
+interface ExpectedBoolean {
+    type: 'boolean';
+}
+
+interface ExpectedStringLiteral {
+    type: 'string-literal';
+    value: string;
+}
+
+interface ExpectedNumberLiteral {
+    type: 'number-literal';
+    value: number;
+}
+
+interface ExpectedBooleanLiteral {
+    type: 'boolean-literal';
+    value: boolean;
+}
+
+interface ExpectedObject {
+    type: 'object';
+}
+
+interface ExpectedDate {
+    type: 'date';
+}
+
+interface ExpectedNonPrimitive {
+    type: 'non-primitive';
+}
+
+interface MissingObjectProperty {
+    type: 'missing-property';
+    property: string;
+}
+
+interface SuperfluousObjectProperty {
+    type: 'superfluous-property';
+}
+
+interface ExpectedObjectKeyof {
+    type: 'object-keyof';
+    properties: string[];
+}
+
+interface ExpectedArray {
+    type: 'array';
+}
+
+interface NeverType {
+    type: 'never';
+}
+
+interface ExpectedTuple {
+    type: 'tuple';
+    minLength: number;
+    maxLength: number;
+}
+
+interface NoValidUnionAlternatives {
+    type: 'union';
+}
+
+interface ExpectedUndefined {
+    type: 'undefined';
+}
+
+interface ExpectedNull {
+    type: 'null';
+}
+
+type Reason = ExpectedString
+    | ExpectedNumber
+    | ExpectedBigInt
+    | ExpectedBoolean
+    | ExpectedObject
+    | ExpectedDate
+    | ExpectedNonPrimitive
+    | MissingObjectProperty
+    | SuperfluousObjectProperty
+    | ExpectedObjectKeyof
+    | ExpectedArray
+    | ExpectedTuple
+    | NeverType
+    | NoValidUnionAlternatives
+    | ExpectedUndefined
+    | ExpectedNull
+    | ExpectedStringLiteral
+    | ExpectedNumberLiteral
+    | ExpectedBooleanLiteral;
 
 /**
- * Set default getErrorMessage function used for transpiled source.
+ * Set default getErrorObject function used for transpiled source.
  *
- * @param getErrorMessage
+ * @param getErrorObject
  */
-export function setDefaultGetErrorMessage(getErrorMessage?: () => string | null): void;
+export function setDefaultGetErrorObject(getErrorObject?: () => { message: string, path: string[], reason: Reason } | null): void;

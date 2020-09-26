@@ -18,7 +18,7 @@ npm install --save typescript-is
 # Ensure you have the required dependencies at compile time:
 npm install --save-dev typescript
 
-# If you want to use the decorators, ensure you have reflect-metadata in your depdendencies:
+# If you want to use the decorators, ensure you have reflect-metadata in your dependencies:
 npm install --save reflect-metadata
 ```
 
@@ -46,6 +46,12 @@ In these situations `typescript-is` can come to your rescue.
 
 *NOTE* this package aims to generate type predicates for any *serializable* JavaScript object.
 Please check [What it won't do](#-what-it-wont-do) for details.
+
+### Similar projects
+
+* [io-ts-transformer](https://github.com/awerlogus/io-ts-transformer)
+* [io-ts](https://github.com/gcanti/io-ts)
+* [ts-auto-guard](https://github.com/usabilityhub/ts-auto-guard)
 
 # 🎛️ Configuration
 
@@ -86,6 +92,37 @@ npx ttsc
 
 Please check the README of [ttypescript](https://github.com/cevek/ttypescript/blob/master/README.md) for information on how to use it in combination with `ts-node`, `webpack`, and `Rollup`.
 
+## Using with `webpack + ts-loader` without `ttypescript`
+
+If you are using `ts-loader` in a `webpack` project, you can use [getCustomTransformers](https://github.com/TypeStrong/ts-loader#getcustomtransformers) as suggested in #54.
+This means you don't need to use `ttypescript` or write a custom compilation script.
+
+Example:
+
+```javascript
+const typescriptIsTransformer = require('typescript-is/lib/transform-inline/transformer').default
+
+module.exports = {
+    // I am hiding the rest of the webpack config
+    module: {
+        rules: [
+            {
+                test: /\.ts$/,
+                exclude: /node_modules/,
+                loader: 'ts-loader',
+                options: {
+                    getCustomTransformers: program => ({
+                        before: [typescriptIsTransformer(program)]
+                    })
+                }
+            }
+        ]
+    }
+};
+```
+
+Note: This will not work if `ts-loader` is configured with `transpileOnly: true`.
+
 ## Options
 
 There are some options to configure the transformer.
@@ -93,8 +130,9 @@ There are some options to configure the transformer.
 | Property | Description |
 |--|--|
 | `shortCircuit` | Boolean (default `false`). If `true`, all type guards will return `true`, i.e. no validation takes place. Can be used for example in production deployments where doing a lot of validation can cost too much CPU. |
-| `ignoreClasses` | Boolean (default: `false`). If `true`, when the transformer encounters a class, it will ignore it and simply return `true`. If `false`, an error is generated at compile time. |
+| `ignoreClasses` | Boolean (default: `false`). If `true`, when the transformer encounters a class (except for `Date`), it will ignore it and simply return `true`. If `false`, an error is generated at compile time. |
 | `ignoreMethods` | Boolean (default: `false`). If `true`, when the transformer encounters a method, it will ignore it and simply return `true`. If `false`, an error is generated at compile time. |
+| `ignoreFunctions` | Boolean (default: `false`). If `true`, when the transformer encounters a function, it will ignore it and simply return `true`. If `false`, an error is generated at compile time. |
 | `disallowSuperfluousObjectProperties` | Boolean (default: `false`). If `true`, objects are checked for having superfluous properties and will cause the validation to fail if they do. If `false`, no check for superfluous properties is made. |
 
 If you are using `ttypescript`, you can include the options in your `tsconfig.json`:
@@ -108,6 +146,7 @@ If you are using `ttypescript`, you can include the options in your `tsconfig.js
                 "shortCircuit": true,
                 "ignoreClasses": true,
                 "ignoreMethods": true,
+                "ignoreFunctions": true,
                 "disallowSuperfluousObjectProperties": true
             }
         ]
@@ -240,7 +279,7 @@ There you can find all the different types that are tested for.
 
 * This library aims to be able to check any serializable data.
 * This library will not check functions. Function signatures are impossible to check at run-time.
-* This library will not check classes. Instead, you are encouraged to use the native `instanceof` operator. For example:
+* This library will not check classes (except the global `Date`). Instead, you are encouraged to use the native `instanceof` operator. For example:
 
 ```typescript
 import { is } from 'typescript-is';
@@ -274,12 +313,6 @@ If you stumble upon anything else that is not yet supported, please open an issu
 
 Features that are planned:
 
-* ~~More detailed error message when using `assertType` and `createAssertType`.
-Give the reason why the assertion failed to the user as part of the error.~~
-[issue 2](https://github.com/woutervh-/typescript-is/issues/2)
-Done as of version `0.10.0`.
-* ~~Support detailed error message when using the decorators `@ValidateClass` and `@AssertType`.~~
-* ~~Detect additional keys. [issue 11](https://github.com/woutervh-/typescript-is/issues/11)~~ Done as of version `0.11.0`.
 * Promise support. Something like `assertOrReject<Type>(object)` will either `resolve(object)` or `reject(error)`.
 * Optimize the generated conditions. Things like `false || "key" === "key"` can be simplified. Might be more interesting to publish a different library that can transform a TypeScript AST, and then use it here, or use an existing one. Might be out of scope, as there are plenty of minifiers/uglifiers/manglers out there already.
 

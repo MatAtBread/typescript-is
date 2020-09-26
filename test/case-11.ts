@@ -24,7 +24,7 @@ describe('@ValidateClass, @AssertType', () => {
         });
 
         it('should throw an error for non-numbers', () => {
-            const expectedMessageRegExp = /validation failed at \$: expected a number$/;
+            const expectedMessageRegExp = /validation failed at parameter: expected a number, found: .*$/;
             assert.throws(() => instance.testMethod('' as any), expectedMessageRegExp);
             assert.throws(() => instance.testMethod('0' as any), expectedMessageRegExp);
             assert.throws(() => instance.testMethod('1' as any), expectedMessageRegExp);
@@ -52,7 +52,7 @@ describe('@ValidateClass, @AssertType', () => {
         });
 
         it('should throw an error for non-strings', () => {
-            const expectedMessageRegExp = /validation failed at \$: expected a string$/;
+            const expectedMessageRegExp = /validation failed at parameter: expected a string, found: .*$/;
             assert.throws(() => instance.testMethod(0 as any), expectedMessageRegExp);
             assert.throws(() => instance.testMethod(1 as any), expectedMessageRegExp);
             assert.throws(() => instance.testMethod(true as any), expectedMessageRegExp);
@@ -90,35 +90,6 @@ describe('@ValidateClass, @AssertType', () => {
             assert.throws(() => instance.testMethod(1 as any), expectedMessageRegExp);
             assert.throws(() => instance.testMethod('' as any), expectedMessageRegExp);
             assert.throws(() => instance.testMethod('true' as any), expectedMessageRegExp);
-            assert.throws(() => instance.testMethod({} as any), expectedMessageRegExp);
-            assert.throws(() => instance.testMethod([] as any), expectedMessageRegExp);
-        });
-    });
-
-    describe('@ValidateClass(), @AssertType({ message: \'Foobar\' }) parameter: string', () => {
-        const expectedMessageRegExp = /Foobar$/;
-
-        @ValidateClass()
-        class TestClass {
-            testMethod(@AssertType({ message: 'Foobar' }) parameter: string) {
-                return parameter;
-            }
-        }
-
-        const instance = new TestClass();
-
-        it('should pass validation for strings', () => {
-            assert.deepStrictEqual(instance.testMethod(''), '');
-            assert.deepStrictEqual(instance.testMethod('0'), '0');
-            assert.deepStrictEqual(instance.testMethod('1'), '1');
-            assert.deepStrictEqual(instance.testMethod('foo'), 'foo');
-        });
-
-        it('should throw an error for non-strings with the provided custom message', () => {
-            assert.throws(() => instance.testMethod(0 as any), expectedMessageRegExp);
-            assert.throws(() => instance.testMethod(1 as any), expectedMessageRegExp);
-            assert.throws(() => instance.testMethod(true as any), expectedMessageRegExp);
-            assert.throws(() => instance.testMethod(false as any), expectedMessageRegExp);
             assert.throws(() => instance.testMethod({} as any), expectedMessageRegExp);
             assert.throws(() => instance.testMethod([] as any), expectedMessageRegExp);
         });

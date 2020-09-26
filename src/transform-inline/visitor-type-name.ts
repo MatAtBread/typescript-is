@@ -4,6 +4,7 @@ import { VisitorContext } from './visitor-context';
 import * as VisitorUtils from './visitor-utils';
 import * as VisitorKeyof from './visitor-keyof';
 import * as VisitorIndexedAccess from './visitor-indexed-access';
+import { checkIsDateClass } from './visitor-utils';
 
 interface TypeCheckNameMode {
     type: 'type-check';
@@ -67,6 +68,8 @@ function visitObjectType(type: ts.ObjectType, visitorContext: VisitorContext, mo
         return visitTupleObjectType(type, visitorContext, mode);
     } else if (visitorContext.checker.getIndexTypeOfType(type, ts.IndexKind.Number)) {
         return visitArrayObjectType(type, visitorContext, mode);
+    } else if (checkIsDateClass(type)) {
+        return '_date';
     } else {
         return visitRegularObjectType(type);
     }
@@ -109,7 +112,7 @@ export function visitType(type: ts.Type, visitorContext: VisitorContext, mode: N
     } else if ((ts.TypeFlags.Number & type.flags) !== 0) {
         name = VisitorUtils.getNumberFunction(visitorContext);
     } else if (VisitorUtils.isBigIntType(type)) {
-        name = VisitorUtils.getBigintFunction(visitorContext);
+        name = VisitorUtils.getBigIntFunction(visitorContext);
     } else if ((ts.TypeFlags.Boolean & type.flags) !== 0) {
         name = VisitorUtils.getBooleanFunction(visitorContext);
     } else if ((ts.TypeFlags.String & type.flags) !== 0) {

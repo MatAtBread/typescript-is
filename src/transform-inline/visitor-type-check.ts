@@ -8,6 +8,70 @@ import * as VisitorIsStringKeyof from './visitor-is-string-keyof';
 import * as VisitorTypeName from './visitor-type-name';
 import { sliceSet } from './utils';
 
+function visitDateType(type: ts.ObjectType, visitorContext: VisitorContext) {
+    const name = VisitorTypeName.visitType(type, visitorContext, { type: 'type-check' });
+    return VisitorUtils.setFunctionIfNotExists(name, visitorContext, () => {
+        return ts.createFunctionDeclaration(
+            undefined,
+            undefined,
+            undefined,
+            name,
+            undefined,
+            [ts.createParameter(undefined, undefined, undefined, VisitorUtils.objectIdentifier, undefined, undefined, undefined)],
+            undefined,
+            ts.createBlock(
+                [
+                    ts.createVariableStatement(
+                        undefined,
+                        ts.createVariableDeclarationList(
+                            [ts.createVariableDeclaration(
+                                ts.createIdentifier('nativeDateObject'),
+                                undefined,
+                                undefined
+                            )],
+                            ts.NodeFlags.Let
+                        )
+                    ),
+                    ts.createIf(
+                        ts.createBinary(
+                            ts.createTypeOf(ts.createIdentifier('global')),
+                            ts.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
+                            ts.createStringLiteral('undefined')
+                        ),
+                        ts.createExpressionStatement(ts.createBinary(
+                            ts.createIdentifier('nativeDateObject'),
+                            ts.createToken(ts.SyntaxKind.EqualsToken),
+                            ts.createPropertyAccess(
+                                ts.createIdentifier('window'),
+                                ts.createIdentifier('Date')
+                            )
+                        )),
+                        ts.createExpressionStatement(ts.createBinary(
+                            ts.createIdentifier('nativeDateObject'),
+                            ts.createToken(ts.SyntaxKind.EqualsToken),
+                            ts.createPropertyAccess(
+                                ts.createIdentifier('global'),
+                                ts.createIdentifier('Date')
+                            )
+                        ))
+                    ),
+                    ts.createIf(
+                        ts.createLogicalNot(
+                            ts.createBinary(
+                                ts.createIdentifier('object'),
+                                ts.createToken(ts.SyntaxKind.InstanceOfKeyword),
+                                ts.createIdentifier('nativeDateObject')
+                            )
+                        ),
+                        ts.createReturn(VisitorUtils.createErrorObject({ type: 'date' })),
+                        ts.createReturn(ts.createNull())
+                    )],
+                true
+            )
+        )
+    });
+}
+
 function visitTupleObjectType(type: ts.TupleType, visitorContext: VisitorContext) {
     const name = VisitorTypeName.visitType(type, visitorContext, { type: 'type-check' });
     return VisitorUtils.setFunctionIfNotExists(name, visitorContext, () => {
@@ -37,6 +101,7 @@ function visitTupleObjectType(type: ts.TupleType, visitorContext: VisitorContext
             ],
             undefined,
             ts.createBlock([
+                VisitorUtils.createStrictNullCheckStatement(VisitorUtils.objectIdentifier, visitorContext),
                 ts.createIf(
                     VisitorUtils.createBinaries(
                         [
@@ -66,23 +131,7 @@ function visitTupleObjectType(type: ts.TupleType, visitorContext: VisitorContext
                         ],
                         ts.SyntaxKind.BarBarToken
                     ),
-                    ts.createReturn(
-                        VisitorUtils.createBinaries(
-                            [
-                                ts.createStringLiteral('validation failed at '),
-                                ts.createCall(
-                                    ts.createPropertyAccess(
-                                        VisitorUtils.pathIdentifier,
-                                        'join'
-                                    ),
-                                    undefined,
-                                    [ts.createStringLiteral('.')]
-                                ),
-                                ts.createStringLiteral(`: expected an array with length ${minLength}-${maxLength}`)
-                            ],
-                            ts.SyntaxKind.PlusToken
-                        )
-                    )
+                    ts.createReturn(VisitorUtils.createErrorObject({ type: 'tuple', minLength, maxLength }))
                 ),
                 ...functionNames.map((functionName, index) =>
                     ts.createBlock([
@@ -147,6 +196,7 @@ function visitArrayObjectType(type: ts.ObjectType, visitorContext: VisitorContex
             ],
             undefined,
             ts.createBlock([
+                VisitorUtils.createStrictNullCheckStatement(VisitorUtils.objectIdentifier, visitorContext),
                 ts.createIf(
                     ts.createLogicalNot(
                         ts.createCall(
@@ -155,23 +205,7 @@ function visitArrayObjectType(type: ts.ObjectType, visitorContext: VisitorContex
                             [VisitorUtils.objectIdentifier]
                         )
                     ),
-                    ts.createReturn(
-                        VisitorUtils.createBinaries(
-                            [
-                                ts.createStringLiteral('validation failed at '),
-                                ts.createCall(
-                                    ts.createPropertyAccess(
-                                        VisitorUtils.pathIdentifier,
-                                        'join'
-                                    ),
-                                    undefined,
-                                    [ts.createStringLiteral('.')]
-                                ),
-                                ts.createStringLiteral(': expected an array')
-                            ],
-                            ts.SyntaxKind.PlusToken
-                        )
-                    )
+                    ts.createReturn(VisitorUtils.createErrorObject({ type: 'array' }))
                 ),
                 ts.createFor(
                     ts.createVariableDeclarationList(
@@ -237,7 +271,7 @@ function visitArrayObjectType(type: ts.ObjectType, visitorContext: VisitorContex
 function visitRegularObjectType(type: ts.ObjectType, visitorContext: VisitorContext) {
     const name = VisitorTypeName.visitType(type, visitorContext, { type: 'type-check', superfluousPropertyCheck: visitorContext.options.disallowSuperfluousObjectProperties });
     return VisitorUtils.setFunctionIfNotExists(name, visitorContext, () => {
-        const propertyInfos = visitorContext.checker.getPropertiesOfType(type).map((property) => VisitorUtils.getPropertyInfo(property, visitorContext));
+        const propertyInfos = visitorContext.checker.getPropertiesOfType(type).map((property) => VisitorUtils.getPropertyInfo(type, property, visitorContext));
         const stringIndexType = visitorContext.checker.getIndexTypeOfType(type, ts.IndexKind.String);
         const stringIndexFunctionName = stringIndexType ? visitType(stringIndexType, visitorContext) : undefined;
         const keyIdentifier = ts.createIdentifier('key');
@@ -253,6 +287,7 @@ function visitRegularObjectType(type: ts.ObjectType, visitorContext: VisitorCont
             ],
             undefined,
             ts.createBlock([
+                VisitorUtils.createStrictNullCheckStatement(VisitorUtils.objectIdentifier, visitorContext),
                 ts.createIf(
                     VisitorUtils.createBinaries(
                         [
@@ -272,23 +307,7 @@ function visitRegularObjectType(type: ts.ObjectType, visitorContext: VisitorCont
                         ],
                         ts.SyntaxKind.BarBarToken
                     ),
-                    ts.createReturn(
-                        VisitorUtils.createBinaries(
-                            [
-                                ts.createStringLiteral('validation failed at '),
-                                ts.createCall(
-                                    ts.createPropertyAccess(
-                                        VisitorUtils.pathIdentifier,
-                                        'join'
-                                    ),
-                                    undefined,
-                                    [ts.createStringLiteral('.')]
-                                ),
-                                ts.createStringLiteral(': expected an object')
-                            ],
-                            ts.SyntaxKind.PlusToken
-                        )
-                    )
+                    ts.createReturn(VisitorUtils.createErrorObject({ type: 'object' }))
                 ),
                 ...propertyInfos.map((propertyInfo) => {
                     if (propertyInfo.isSymbol) {
@@ -340,23 +359,7 @@ function visitRegularObjectType(type: ts.ObjectType, visitorContext: VisitorCont
                             ]),
                             propertyInfo.optional
                                 ? undefined
-                                : ts.createReturn(
-                                    VisitorUtils.createBinaries(
-                                        [
-                                            ts.createStringLiteral('validation failed at '),
-                                            ts.createCall(
-                                                ts.createPropertyAccess(
-                                                    VisitorUtils.pathIdentifier,
-                                                    'join'
-                                                ),
-                                                undefined,
-                                                [ts.createStringLiteral('.')]
-                                            ),
-                                            ts.createStringLiteral(`: expected '${propertyInfo.name}' in object`)
-                                        ],
-                                        ts.SyntaxKind.PlusToken
-                                    )
-                                )
+                                : ts.createReturn(VisitorUtils.createErrorObject({ type: 'missing-property', property: propertyInfo.name }))
                         )
                     ]);
                 }),
@@ -440,7 +443,17 @@ function visitTypeParameter(type: ts.Type, visitorContext: VisitorContext) {
 
 function visitObjectType(type: ts.ObjectType, visitorContext: VisitorContext) {
     if (VisitorUtils.checkIsClass(type, visitorContext)) {
-        return VisitorUtils.getIgnoredTypeFunction(visitorContext);
+        // Dates
+        if (VisitorUtils.checkIsDateClass(type)) {
+            return visitDateType(type, visitorContext);
+        }
+
+        // all other classes
+        if (visitorContext.options.ignoreClasses) {
+            return VisitorUtils.getIgnoredTypeFunction(visitorContext);
+        } else {
+            throw new Error('Classes cannot be validated. https://github.com/woutervh-/typescript-is/issues/3');
+        }
     }
     if (tsutils.isTupleType(type)) {
         // Tuple with finite length.
@@ -448,6 +461,14 @@ function visitObjectType(type: ts.ObjectType, visitorContext: VisitorContext) {
     } else if (visitorContext.checker.getIndexTypeOfType(type, ts.IndexKind.Number)) {
         // Index type is number -> array type.
         return visitArrayObjectType(type, visitorContext);
+    } else if ('valueDeclaration' in type.symbol
+        && (type.symbol.valueDeclaration.kind === ts.SyntaxKind.MethodDeclaration || type.symbol.valueDeclaration.kind === ts.SyntaxKind.FunctionType)
+    ) {
+        if (visitorContext.options.ignoreFunctions) {
+            return VisitorUtils.getIgnoredTypeFunction(visitorContext);
+        } else {
+            throw new Error('Encountered a function declaration, but functions are not supported. Issue: https://github.com/woutervh-/typescript-is/issues/50');
+        }
     } else {
         // Index type is string -> regular object type.
         return visitRegularObjectType(type, visitorContext);
@@ -464,20 +485,23 @@ function visitLiteralType(type: ts.LiteralType, visitorContext: VisitorContext) 
                     VisitorUtils.objectIdentifier,
                     ts.createStringLiteral(value)
                 ),
-                `expected string '${type.value}'`,
-                name
+                { type: 'string-literal', value },
+                name,
+                VisitorUtils.createStrictNullCheckStatement(VisitorUtils.objectIdentifier, visitorContext)
             );
         });
     } else if (typeof type.value === 'number') {
         const name = VisitorTypeName.visitType(type, visitorContext, { type: 'type-check' });
+        const value = type.value;
         return VisitorUtils.setFunctionIfNotExists(name, visitorContext, () => {
             return VisitorUtils.createAssertionFunction(
                 ts.createStrictInequality(
                     VisitorUtils.objectIdentifier,
-                    ts.createNumericLiteral(type.value.toString())
+                    ts.createNumericLiteral(value.toString())
                 ),
-                `expected number '${type.value}'`,
-                name
+                { type: 'number-literal', value },
+                name,
+                VisitorUtils.createStrictNullCheckStatement(VisitorUtils.objectIdentifier, visitorContext)
             );
         });
     } else {
@@ -524,8 +548,9 @@ function visitBooleanLiteral(type: ts.Type, visitorContext: VisitorContext) {
                     VisitorUtils.objectIdentifier,
                     ts.createTrue()
                 ),
-                `expected true`,
-                name
+                { type: 'boolean-literal', value: true },
+                name,
+                VisitorUtils.createStrictNullCheckStatement(VisitorUtils.objectIdentifier, visitorContext)
             );
         });
     } else if (intrinsicName === 'false') {
@@ -536,8 +561,9 @@ function visitBooleanLiteral(type: ts.Type, visitorContext: VisitorContext) {
                     VisitorUtils.objectIdentifier,
                     ts.createFalse()
                 ),
-                `expected false`,
-                name
+                { type: 'boolean-literal', value: false },
+                name,
+                VisitorUtils.createStrictNullCheckStatement(VisitorUtils.objectIdentifier, visitorContext)
             );
         });
     } else {
@@ -576,8 +602,9 @@ function visitNonPrimitiveType(type: ts.Type, visitorContext: VisitorContext) {
             const condition = VisitorUtils.createBinaries(conditions, ts.SyntaxKind.AmpersandAmpersandToken);
             return VisitorUtils.createAssertionFunction(
                 ts.createLogicalNot(condition),
-                `expected a non-primitive`,
-                name
+                { type: 'non-primitive' },
+                name,
+                VisitorUtils.createStrictNullCheckStatement(VisitorUtils.objectIdentifier, visitorContext)
             );
         });
     } else {
@@ -610,7 +637,7 @@ function visitNumber(visitorContext: VisitorContext) {
 }
 
 function visitBigInt(visitorContext: VisitorContext) {
-    return VisitorUtils.getBigintFunction(visitorContext);
+    return VisitorUtils.getBigIntFunction(visitorContext);
 }
 
 function visitBoolean(visitorContext: VisitorContext) {
